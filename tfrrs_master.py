@@ -14,7 +14,8 @@ outdoor_lists = [3711,3191,2909,2279,1912,1688,1439,1228,1029,840,673]
 indoor_events = ["60 Meters", "200 Meters", "400 Meters", "800 Meters", "Mile", "3000 Meters", "5000 Meters", "60 Hurdles"]
 outoor_events = ["100 Meters", "200 Meters", "400 Meters", "800 Meters", "1500 Meters", "5000 Meters", "110 Hurdles", "400 Hurdles", "3000 Steeplechase"]
 
-headers = ["PLACE", "ATHLETE", "YEAR", "TEAM", "TIME", "MEET", "DATE", "EVENT"]
+indoor_headers = ["PLACE", "ATHLETE", "URL", "TEAM", "MEET", "DATE", "ATHLETE_ID", "SCHOOL_ID", "YEAR", "EVENT", "TIME"]
+outdoor_headers = ["PLACE", "ATHLETE", "URL", "TEAM", "MEET", "DATE", "ATHLETE_ID", "SCHOOL_ID", "YEAR", "WIND", "EVENT", "TIME"]
 
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36"
 # US english
@@ -100,9 +101,13 @@ def format_time(time):
     return sec
 
 def get_school_id(school):
-    if school not in school_ids:
-        school_ids[school] = str(uuid.uuid4().int)
-    return school_ids[school]
+
+    if school.upper() == 'Unattached'.upper():
+        return '-1'
+
+    if school.upper() not in school_ids:
+        school_ids[school.upper()] = str(uuid.uuid4().int)
+    return school_ids[school.upper()]
 
 def format_grade(grade):
     return {'FR-1': '1', 'SO-2': '2', 'JR-3': '3', 'SR-4': '4', '': ''}[grade]
@@ -112,31 +117,15 @@ def format_date(date):
     split_date  = re.split('\W+', date)
     return '{:02d}'.format(datetime.datetime.strptime(split_date[0],'%b').month) + '/' + split_date[1] + '/' + split_date[2]
 
+
 def format_row(row, event, indoor):
 
     row[3] = format_grade(row[3])
     row[5] = format_time(row[5])
     row[7] = format_date(row[7])
 
-    '''# replace " with ' in non-name fields
-    for i in range(len(row)):
-        if i == 1:
-            continue
-        if '"' in str(row[i]):
-            row[i] = row[i].replace('"', '\'')'''        
-
-    '''
-    if indoor:
-        # rank, name, url, school, meet, date, name id, school id, grade, event, time
-        row = [row[0], row[1], row[2], row[4], row[6], row[7], get_athlete_id(row[2]), get_school_id(row[4]), row[3], event, row[5]]
-    else:
-        # rank, name, url, school, meet, date, name id, school id, grade, wind (or 0), event, time
-        row = [row[0], row[1], row[2], row[4], row[6], row[7], get_athlete_id(row[2]), get_school_id(row[4]), row[3], row[8] if len(row) == 9 else '0.0', event, row[5]]
-    return row'''
-
     # returna and rearrange columns as: rank, name, url, school, meet, date, name id, school id, grade, [wind (or 0),] event, time
     return [row[0], row[1], row[2], row[4], row[6], row[7], get_athlete_id(row[2]), get_school_id(row[4]), row[3], event, row[5]] if indoor else [row[0], row[1], row[2], row[4], row[6], row[7], get_athlete_id(row[2]), get_school_id(row[4]), row[3], row[8] if len(row) == 9 else '0.0', event, row[5]]
-
 
 
 #change so fie is delted adn recreatde if exists and add header to top
@@ -189,7 +178,7 @@ def get_data(indoor):
 
 #get_data(False)
 
-#processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
+processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
 
-processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
+#processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
 
