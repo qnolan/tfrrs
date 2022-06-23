@@ -77,11 +77,13 @@ def format_row(row, event, indoor, athlete):
         if record_month == 11 or record_month == 12:
             record_year += 1
 
+        # adjust grade accordingly
         if race_year != record_year:
             grade -= record_year - race_year
             grade = 1 if grade < 1 else grade
             grade = 4 if grade > 4 else grade
 
+    # format the same as the master file but no rank
     return [athlete[1], school, row[1], date, name_id, school_id, str(grade), event, time] if indoor else [athlete[1], school, row[1], date, name_id, school_id, str(grade), wind, event, time]
 
 def save_table_rows(table, athlete, imap, omap):
@@ -156,10 +158,6 @@ def get_athlete_data(entries, athletes, ct):
 
             # extract all the tables from the web page
             tables = soup.find_all('table')
-            '''mutex.acquire()
-            print(f"[x] Found a total of {len(tables)} tables.")
-            mutex.release()'''
-
 
             imap = {i: False for i in indoor_events}
             omap = {o: False for o in outoor_events}
@@ -181,6 +179,7 @@ def process_file(filename, athletes):
         ct = len(athletes)
         athletes += [''] * len(lines)
 
+        # each thread processes an equal amount of athletes excpet the last one which does the rest
         for i in range(NUM_CPUS):
             if i == NUM_CPUS - 1:
                 ts[i] = Thread(target=get_athlete_data, args=[lines[t_len * i:], athletes, ct])
@@ -189,7 +188,7 @@ def process_file(filename, athletes):
                 ct += t_len
             ts[i].start()
         
-        # join al threads
+        # join all threads
         for i in range(NUM_CPUS):
             ts[i].join()
 
@@ -213,5 +212,4 @@ with open('school_ids.csv', 'w+') as f:
     for k in master.school_ids:
         writer.writerow([k, master.school_ids[k]])
 
-#process_file('master_indoor.csv')
 

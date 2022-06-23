@@ -1,4 +1,3 @@
-from asyncore import read
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup as bs
@@ -184,14 +183,15 @@ def get_data(indoor):
 
     return 0
 
-
+'''Uncomment the two lines below to grab the master data'''
 #get_data(False)
 #get_data(True)
 
+'''This is how you can get data from a singl qualifying list'''
 #processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
-
 #processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
 
+'''Saves the school_ids to use in tfrrs_athletes'''
 with open('school_ids.csv', 'w+') as f:
     writer = csv.writer(f)
     for k in school_ids:
