@@ -1,4 +1,3 @@
-from re import T
 import tfrrs_master as master
 import csv
 import re
@@ -7,7 +6,7 @@ from threading import Thread, Lock
 import multiprocessing
 
 NUM_CPUS = multiprocessing.cpu_count()
-#NUM_CPUS = 1
+#NUM_CPUS = 32
 
 print('Number of CPUs: ', NUM_CPUS)
 
@@ -47,9 +46,6 @@ def format_row(row, event, indoor, athlete):
 
     # convert to seconds if not FS, DQ, DNF, ...
     if not bool(re.search('[^\d.:]', time)):
-        '''mutex.acquire()
-        print('athlete', athlete, 'row', row, '\ntime', time)
-        mutex.release()'''
         time = master.format_time(time)
 
     # takes care of 'Mmm dd-dd, yyyy' format
@@ -139,10 +135,9 @@ def save_table_rows(table, athlete, imap, omap):
     
     if rows != [] and filename != '':
         mutex.acquire()
-        try:
-            master.save_as_csv(rows, filename)   
-        finally:
-            mutex.release()
+        print(f'[x] processed {len(rows)} entries')
+        master.save_as_csv(rows, filename)   
+        mutex.release()
 
 # "https://www.tfrrs.org/athletes/7722962/Oregon/Micah_Williams"
 def get_athlete_data(entries, athletes, ct):
@@ -161,9 +156,9 @@ def get_athlete_data(entries, athletes, ct):
 
             # extract all the tables from the web page
             tables = soup.find_all('table')
-            mutex.acquire()
+            '''mutex.acquire()
             print(f"[x] Found a total of {len(tables)} tables.")
-            mutex.release()
+            mutex.release()'''
 
 
             imap = {i: False for i in indoor_events}
@@ -177,14 +172,14 @@ def get_athlete_data(entries, athletes, ct):
             mutex.release()
     return 0
 
-def process_file(filename):
+def process_file(filename, athletes):
     with open(filename) as file:
         lines = list(csv.reader(file))
         t_len = len(lines) // NUM_CPUS
 
         ts = [None] * NUM_CPUS
-        athletes = [''] * len(lines)
-        ct = 0
+        ct = len(athletes)
+        athletes += [''] * len(lines)
 
         for i in range(NUM_CPUS):
             if i == NUM_CPUS - 1:
@@ -207,7 +202,11 @@ if os.path.exists('athletes_indoor.csv'):
 
 print(len(master.school_ids))
 
-process_file('master_indoor.csv')
+athletes = []
+
+#process_file('test.csv', athletes)
+process_file('master_indoor.csv', athletes)
+process_file('master_outdoor.csv', athletes)
 
 with open('school_ids.csv', 'w+') as f:
     writer = csv.writer(f)
