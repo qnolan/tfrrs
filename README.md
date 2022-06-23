@@ -44,7 +44,7 @@ these lines are commented out so that you do not have to get the master data eve
 
 `threads.py` - basic multithreading example I made to learn python multithreading
 
-`school_ids.csv` - a csv file of (school anme, school ID) pairs from the school IDs that we generate using uuid
+`school_ids.csv` - a csv file of (school name, school ID) pairs from the school IDs that we generate using uuid
 
 `master_{indoor,outdoor}.csv` - master data files that contain the top 500 times (including rank, athlete name, athlete school, meet, date, time, wind if applicable, grade, athlete URL, name ID, school ID, and event) for each event in the last 10 years
 
