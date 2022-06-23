@@ -1,3 +1,4 @@
+from asyncore import read
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup as bs
@@ -5,8 +6,14 @@ import os
 import datetime
 import re
 import uuid
+import csv
 
 school_ids = {}
+
+with open('school_ids.csv', 'r') as f:
+    reader = csv.reader(f)
+    for line in reader:
+        school_ids[line[0]] = line[1]
 
 indoor_lists = [3492,3157,2770,2324,2124,1797,1569,1345,1139,942,769,607,502]
 outdoor_lists = [3711,3191,2909,2279,1912,1688,1439,1228,1029,840,673]
@@ -110,7 +117,9 @@ def get_school_id(school):
     return school_ids[school.upper()]
 
 def format_grade(grade):
-    return {'FR-1': '1', 'SO-2': '2', 'JR-3': '3', 'SR-4': '4', '': ''}[grade]
+    grades = {'FR-1': '1', 'SO-2': '2', 'JR-3': '3', 'SR-4': '4', '': ''}
+    if grade not in grades:
+        return ''
 
 # convert dates (ex: 'Jan 14, 2022' -> '01/14/2022')
 def format_date(date):
@@ -177,8 +186,13 @@ def get_data(indoor):
 
 
 #get_data(False)
+#get_data(True)
 
-processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
+#processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
 
 #processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
 
+with open('school_ids.csv', 'w+') as f:
+    writer = csv.writer(f)
+    for k in school_ids:
+        writer.writerow([k, school_ids[k]])

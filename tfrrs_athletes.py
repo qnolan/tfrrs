@@ -3,17 +3,18 @@ import tfrrs_master as master
 import csv
 import re
 import os
+from threading import Thread, Lock
+import multiprocessing
 
-athletes = []
+NUM_CPUS = multiprocessing.cpu_count()
+#NUM_CPUS = 1
 
+print('Number of CPUs: ', NUM_CPUS)
+
+mutex = Lock()
 
 indoor_events = ["60 Meters (Indoor)", "200 Meters (Indoor)", "400 Meters (Indoor)", "800 Meters (Indoor)", "Mile (Indoor)", "3000 Meters (Indoor)", "5000 Meters (Indoor)", "60 Hurdles (Indoor)"]
 outoor_events = ["100 Meters (Outdoor)", "200 Meters (Outdoor)", "400 Meters (Outdoor)", "800 Meters (Outdoor)", "1500 Meters (Outdoor)", "5000 Meters (Outdoor)", "110 Hurdles (Outdoor)", "400 Hurdles (Outdoor)", "3000 Steeplechase (Outdoor)"]
-
-imap = {i: False for i in indoor_events}
-omap = {o: False for o in outoor_events}
-
-i = 0
 
 def clean_text(txt):
     return re.sub('[\n\t\r↑]', '', txt.text.strip().replace('Top', ''))
@@ -22,11 +23,13 @@ def clean_text(txt):
 def format_row(row, event, indoor, athlete):
 
     name_id = athlete[6]
-    grade = athlete[8]
+    grade = '' if athlete[8] == '' else int(athlete[8])
     time = row[0]
+    date = row[2]
     wind = '0.0'
     school = athlete[3]
     school_id = master.get_school_id(school)
+    record_year = int(athlete[5][athlete[5].rindex('/') + 1:])
 
     # remove prev school from time cell
     if '*' in time:
@@ -44,14 +47,48 @@ def format_row(row, event, indoor, athlete):
 
     # convert to seconds if not FS, DQ, DNF, ...
     if not bool(re.search('[^\d.:]', time)):
+        '''mutex.acquire()
+        print('athlete', athlete, 'row', row, '\ntime', time)
+        mutex.release()'''
         time = master.format_time(time)
 
-    #date = master.format_date(row[2])
-    date = row[2]
+    # takes care of 'Mmm dd-dd, yyyy' format
+    if '-' in date and ',' in date:
+        date = date.replace(' - ', '-')
+        date = date[:date.index('-')] + date[date.index(','):]
+    # converts from 'Mmm dd, yyyy' to 'mm/dd/yyyy'
+    if ',' in date:
+        date = master.format_date(date)
+    # takes care of '(mm/dd- mm/dd)' -> 'mm/dd/yyyy'
+    if '(' in date and ')' in date:
+        date = date[1:len(date) - 1]
+        if '-' in date:
+            date = date.replace(' - ', '-')
+            date = date.replace('- ', '-')
+            date = date[:date.index('-')] + '/' + str(record_year)
+            if len(date[:date.index('/')]) == 1:
+                date = '0' + date
 
-    return [athlete[1], school, row[1], date, name_id, school_id, grade, event, time] if indoor else [athlete[1], school, row[1], date, name_id, school_id, grade, wind, event, time]
+    if grade != '':
+        # find what year this athlete was for this race
+        race_year = int(date[date.rindex('/') + 1:])
+        race_month = int(date[:date.index('/')])
+        record_month = int(athlete[5][:athlete[5].index('/')])
 
-def save_table_rows(table, athlete):
+        # increment the year if a race happened in Nov/Dec
+        if race_month == 11 or race_month == 12:
+            race_year += 1
+        if record_month == 11 or record_month == 12:
+            record_year += 1
+
+        if race_year != record_year:
+            grade -= record_year - race_year
+            grade = 1 if grade < 1 else grade
+            grade = 4 if grade > 4 else grade
+
+    return [athlete[1], school, row[1], date, name_id, school_id, str(grade), event, time] if indoor else [athlete[1], school, row[1], date, name_id, school_id, str(grade), wind, event, time]
+
+def save_table_rows(table, athlete, imap, omap):
     """Given a table, returns all its rows"""
 
     rows = []
@@ -77,7 +114,7 @@ def save_table_rows(table, athlete):
             filename = 'athletes_indoor.csv'
         
         if process:
-
+            #print('Event:', event)
             # remove the (Outdoor)/(Indoor) from h
             event = event[:event.index('(') - 1]
 
@@ -101,82 +138,81 @@ def save_table_rows(table, athlete):
                     rows.append(cells)
     
     if rows != [] and filename != '':
-        master.save_as_csv(rows, filename)
+        mutex.acquire()
+        try:
+            master.save_as_csv(rows, filename)   
+        finally:
+            mutex.release()
+
+# "https://www.tfrrs.org/athletes/7722962/Oregon/Micah_Williams"
+def get_athlete_data(entries, athletes, ct):
+
+    for athlete in entries:
+
+        # if we have not processed this athlete ID yet
+        mutex.acquire()
+        if athlete[6] not in athletes:
+            athletes[ct] = athlete[6]
+            mutex.release()
+            ct += 1        
+        
+            # get the soup
+            soup = master.get_soup('https:' + athlete[2])
+
+            # extract all the tables from the web page
+            tables = soup.find_all('table')
+            mutex.acquire()
+            print(f"[x] Found a total of {len(tables)} tables.")
+            mutex.release()
+
+
+            imap = {i: False for i in indoor_events}
+            omap = {o: False for o in outoor_events}
+
+            # iterate over all tables
+            for i, table in enumerate(tables, start=1):
+                # get all the rows of the table
+                save_table_rows(table, athlete, imap, omap)
+        else:
+            mutex.release()
+    return 0
 
 def process_file(filename):
     with open(filename) as file:
-        reader = csv.reader(file)
-        for line in reader:
-            global imap, omap
-            imap = {i: False for i in indoor_events}
-            omap = {o: False for o in outoor_events}
-            get_athlete_data(line)
+        lines = list(csv.reader(file))
+        t_len = len(lines) // NUM_CPUS
 
-# "https://www.tfrrs.org/athletes/7722962/Oregon/Micah_Williams"
-def get_athlete_data(athlete):
+        ts = [None] * NUM_CPUS
+        athletes = [''] * len(lines)
+        ct = 0
 
-    # if we have not processed this athlete ID yet
-    if athlete[6] not in athletes:
-        athletes.append(athlete[6])
-    
-        #print(athlete[1])
+        for i in range(NUM_CPUS):
+            if i == NUM_CPUS - 1:
+                ts[i] = Thread(target=get_athlete_data, args=[lines[t_len * i:], athletes, ct])
+            else:
+                ts[i] = Thread(target=get_athlete_data, args=[lines[t_len * i:t_len* (i + 1)], athletes, ct])
+                ct += t_len
+            ts[i].start()
         
-        '''url = 'https://www.tfrrs.org/athletes/8012266/Florida/Jacory_Patterson'
-        #url = 'https://www.tfrrs.org/athletes/6905268/Michigan/Devin_Meyrer'
-        #url = 'https://www.tfrrs.org/athletes/7722962/Oregon/Micah_Williams'
-        '''
+        # join al threads
+        for i in range(NUM_CPUS):
+            ts[i].join()
 
-        # get the soup
-        soup = master.get_soup('https:' + athlete[2])
-
-        # extract all the tables from the web page
-        tables = soup.find_all('table')
-        print(f"[x] Found a total of {len(tables)} tables.")
-
-        # iterate over all tables
-        for i, table in enumerate(tables, start=1):
-            # get all the rows of the table
-            save_table_rows(table, athlete)
-
-    return 0
-
+        return 0
 
 if os.path.exists('athletes_outdoor.csv'):
     os.remove('athletes_outdoor.csv')
 if os.path.exists('athletes_indoor.csv'):
     os.remove('athletes_indoor.csv')
 
-process_file('indoor_2022.csv')
+print(len(master.school_ids))
 
+process_file('master_indoor.csv')
 
+with open('school_ids.csv', 'w+') as f:
+    writer = csv.writer(f)
+    for k in master.school_ids:
+        writer.writerow([k, master.school_ids[k]])
 
-print(f'[+] Found {len(athletes)} athletes')
+#process_file('master_indoor.csv')
 
-
-
-
-
-
-
-
-
-
-
-
-
-''' 
-Cases to consider for names:
-    'Heath Jr., Rodney'         -> 'Rodney_HeathJr'
-    'Carr Jr, Andre'            -> 'Andre_CarrJr'
-    'Croom-McFadden, Malcolm'   -> 'Malcolm_CroomMcFadden'
-    'Davis II, Shakorie'        -> 'Shakorie_DavisII'
-    'Horton, Jon'Terio'         -> 'JonTerio_Horton'
-
-Cases to consider for schools:
-    'N. Carolina A&T'       -> 'N_Carolina_AT'
-    'Arkansas-Little Rock'  -> 'ArkansasLittle_Rock'
-    'Mount St. Mary's'      -> 'Mount_St_Marys'
-    'Loyola (Ill.)'         -> 'Loyola_Ill'
-    'Texas A&M-CC'          -> 'Texas_AMCC'
-
-'''
