@@ -187,7 +187,7 @@ def get_data(indoor):
 #get_data(False)
 #get_data(True)
 
-'''This is how you can get data from a singl qualifying list'''
+'''This is how you can get data from a single qualifying list'''
 #processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
 #processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
 
