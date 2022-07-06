@@ -15,7 +15,9 @@ with open('school_ids.csv', 'r') as f:
         school_ids[line[0]] = line[1]
 
 indoor_lists = [3492,3157,2770,2324,2124,1797,1569,1345,1139,942,769,607,502]
-outdoor_lists = [3711,3191,2909,2279,1912,1688,1439,1228,1029,840,673]
+#indoor_years = []
+outdoor_lists = [3711, 3191, 2909, 2279, 1912, 1688, 1439, 1228, 1029, 840, 673]
+#outdoor_years = [2022, 2021, 2020, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011]
 
 indoor_events = ["60 Meters", "200 Meters", "400 Meters", "800 Meters", "Mile", "3000 Meters", "5000 Meters", "60 Hurdles"]
 outoor_events = ["100 Meters", "200 Meters", "400 Meters", "800 Meters", "1500 Meters", "5000 Meters", "110 Hurdles", "400 Hurdles", "3000 Steeplechase"]
@@ -52,8 +54,6 @@ def get_table_headers(table):
         headers.append(th.text.strip())
     return headers
 
-
-j = 0
 
 def get_table_rows(table, event, indoor):
     """Given a table, returns all its rows"""
@@ -119,6 +119,7 @@ def format_grade(grade):
     grades = {'FR-1': '1', 'SO-2': '2', 'JR-3': '3', 'SR-4': '4', '': ''}
     if grade not in grades:
         return ''
+    return grades[grade]
 
 # convert dates (ex: 'Jan 14, 2022' -> '01/14/2022')
 def format_date(date):
@@ -177,15 +178,14 @@ def get_data(indoor):
     if os.path.exists(filename):
         os.remove(filename)
 
-    i = 0
     for lst in szn_list:
-        processURL(f"https://www.tfrrs.org/lists/{lst}.html?limit=500&event_type=all&year=&gender=", szn_events, indoor, filename)
+        processURL(f"https://www.tfrrs.org/lists/{lst}/2022_NCAA_Division_I_Outdoor_Qualifying_FINAL?limit=500", szn_events, indoor, filename)
 
     return 0
 
 '''Uncomment the two lines below to grab the master data'''
-#get_data(False)
-#get_data(True)
+get_data(False)
+get_data(True)
 
 '''This is how you can get data from a singl qualifying list'''
 #processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
