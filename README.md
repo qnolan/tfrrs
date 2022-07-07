@@ -15,26 +15,14 @@ This could easily be done for the master files as well but those did not take to
 
 I ran my code on `python3.8.10` and it works fine on that (I had problems on `python3.6.8` which I think was due to `BeautifulSoup`).
 
-To get the master file data only run as:
+To get the master file data run as:
 ```
 python3 tfrrs_master.py
 ```
-To get the master file data and athlete file data run as:
+To get the athlete file datarun as:
 ```
 python3 tfrrs_athletes.py
 ```
-To get the athlete file data only run as follows (make sure the below is commented out):
-```
-python3 tfrrs_athletes.py
-```
-To get the master data files uncomment the lines below (re-comment them once you have the master files):
-```
-'''Uncomment the two lines below to grab the master data'''
-#get_data(False)
-#get_data(True)
-```
-
-these lines are commented out so that you do not have to get the master data evertime that you run `tfrrs_athletes.py`
 
 ## Files
 
@@ -42,7 +30,13 @@ these lines are commented out so that you do not have to get the master data eve
 
 `tfrrs_athletes.py` - used for getting the athlete file data (and master file if above is commented out)
 
+`tfrrs_util.py` - shared functions for dealing with tables and formatting data
+
+### tmp
+
 `threads.py` - basic multithreading example I made to learn python multithreading
+
+### data
 
 `school_ids.csv` - a csv file of (school name, school ID) pairs from the school IDs that we generate using uuid
 
