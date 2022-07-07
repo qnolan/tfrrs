@@ -99,4 +99,4 @@ get_data(True)
 #processURL("https://www.tfrrs.org/lists/3492.html?limit=500&event_type=all&year=&gender=m", indoor_events, True, "indoor_2022.csv")
 #processURL("https://www.tfrrs.org/lists/3711.html?limit=500&event_type=all&year=&gender=m", outoor_events, False, "outdoor_2022.csv")
 
-#util.save_school_ids()
+util.save_school_ids()
