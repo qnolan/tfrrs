@@ -1,24 +1,16 @@
-import tfrrs_master as master
-import csv
-import re
-import os
+import tfrrs_util as util
 from threading import Thread, Lock
-import multiprocessing
+import csv, re, os, multiprocessing
 
 NUM_CPUS = multiprocessing.cpu_count()
 #NUM_CPUS = 32
-
 print('Number of CPUs: ', NUM_CPUS)
 
 mutex = Lock()
-
 indoor_events = ["60 Meters (Indoor)", "200 Meters (Indoor)", "400 Meters (Indoor)", "800 Meters (Indoor)", "Mile (Indoor)", "3000 Meters (Indoor)", "5000 Meters (Indoor)", "60 Hurdles (Indoor)"]
 outoor_events = ["100 Meters (Outdoor)", "200 Meters (Outdoor)", "400 Meters (Outdoor)", "800 Meters (Outdoor)", "1500 Meters (Outdoor)", "5000 Meters (Outdoor)", "110 Hurdles (Outdoor)", "400 Hurdles (Outdoor)", "3000 Steeplechase (Outdoor)"]
 
-def clean_text(txt):
-    return re.sub('[\n\t\r↑]', '', txt.text.strip().replace('Top', ''))
-
-
+# formats the given row to what we want
 def format_row(row, event, indoor, athlete):
 
     name_id = athlete[6]
@@ -27,13 +19,13 @@ def format_row(row, event, indoor, athlete):
     date = row[2]
     wind = '0.0'
     school = athlete[3]
-    school_id = master.get_school_id(school)
+    school_id = util.get_school_id(school)
     record_year = int(athlete[5][athlete[5].rindex('/') + 1:])
 
     # remove prev school from time cell
     if '*' in time:
         school = time[time.index('*') + 5:]
-        school_id = master.get_school_id(school)
+        school_id = util.get_school_id(school)
         time = time[:time.index('*')]
 
     # remove wind from time cell
@@ -46,7 +38,7 @@ def format_row(row, event, indoor, athlete):
 
     # convert to seconds if not FS, DQ, DNF, ...
     if not bool(re.search('[^\d.:]', time)):
-        time = master.format_time(time)
+        time = util.format_time(time)
 
     # takes care of 'Mmm dd-dd, yyyy' format
     if '-' in date and ',' in date:
@@ -54,7 +46,7 @@ def format_row(row, event, indoor, athlete):
         date = date[:date.index('-')] + date[date.index(','):]
     # converts from 'Mmm dd, yyyy' to 'mm/dd/yyyy'
     if ',' in date:
-        date = master.format_date(date)
+        date = util.format_date(date)
     # takes care of '(mm/dd- mm/dd)' -> 'mm/dd/yyyy'
     if '(' in date and ')' in date:
         date = date[1:len(date) - 1]
@@ -86,15 +78,14 @@ def format_row(row, event, indoor, athlete):
     # format the same as the master file but no rank
     return [athlete[1], school, row[1], date, name_id, school_id, str(grade), event, time] if indoor else [athlete[1], school, row[1], date, name_id, school_id, str(grade), wind, event, time]
 
+# saves the table rows to a csv after they have been formatted
 def save_table_rows(table, athlete, imap, omap):
-    """Given a table, returns all its rows"""
-
     rows = []
     filename = ''
 
     # get the table header
     for thead in table.find_all('thead'):
-        h = clean_text(thead)
+        h = util.clean_text(thead)
 
         # check that we are seeing this header for the first time
         # (we don't want to process the 'Progression' tab)
@@ -105,11 +96,11 @@ def save_table_rows(table, athlete, imap, omap):
             indoor = False
             omap[h] = True
             process = True
-            filename = 'athletes_outdoor.csv'
+            filename = 'data/athletes_outdoor.csv'
         elif h in imap and imap[h] == False:
             imap[h] = True
             process = True
-            filename = 'athletes_indoor.csv'
+            filename = 'data/athletes_indoor.csv'
         
         if process:
             #print('Event:', event)
@@ -125,23 +116,24 @@ def save_table_rows(table, athlete, imap, omap):
                     # can be found especially in wikipedia tables below the table
                     ths = tr.find_all("th")
                     for i in range(len(ths)):
-                        cells.append(clean_text(ths[i]))
+                        cells.append(util.clean_text(ths[i]))
                 else:
                     # use regular td tags
                     for i in range(len(tds)):
-                        cells.append(clean_text(tds[i]))
+                        cells.append(util.clean_text(tds[i]))
                 # skip table headers
                 if len(cells) > 1:
                     cells = format_row(cells, event, indoor, athlete)
                     rows.append(cells)
     
+    # save the table rows to the csv file
     if rows != [] and filename != '':
         mutex.acquire()
         print(f'[x] processed {len(rows)} entries')
-        master.save_as_csv(rows, filename)   
+        util.save_as_csv(rows, filename)   
         mutex.release()
 
-# "https://www.tfrrs.org/athletes/7722962/Oregon/Micah_Williams"
+# get all event data about an athlete if their data hasn't been gotten yet
 def get_athlete_data(entries, athletes, ct):
 
     for athlete in entries:
@@ -154,7 +146,7 @@ def get_athlete_data(entries, athletes, ct):
             ct += 1        
         
             # get the soup
-            soup = master.get_soup('https:' + athlete[2])
+            soup = util.get_soup(athlete[2] if 'https:' in athlete[2] else 'https:' + athlete[2])
 
             # extract all the tables from the web page
             tables = soup.find_all('table')
@@ -170,6 +162,7 @@ def get_athlete_data(entries, athletes, ct):
             mutex.release()
     return 0
 
+# process the indoor or outdoor master file
 def process_file(filename, athletes):
     with open(filename) as file:
         lines = list(csv.reader(file))
@@ -192,24 +185,17 @@ def process_file(filename, athletes):
         for i in range(NUM_CPUS):
             ts[i].join()
 
-        return 0
+# remove athlete files if they exist
+if os.path.exists('data/athletes_outdoor.csv'):
+    os.remove('data/athletes_outdoor.csv')
+if os.path.exists('data/athletes_indoor.csv'):
+    os.remove('data/athletes_indoor.csv')
 
-if os.path.exists('athletes_outdoor.csv'):
-    os.remove('athletes_outdoor.csv')
-if os.path.exists('athletes_indoor.csv'):
-    os.remove('athletes_indoor.csv')
-
-print(len(master.school_ids))
-
+# keep track of what ahtletes we have processed
 athletes = []
 
-#process_file('test.csv', athletes)
-process_file('master_indoor.csv', athletes)
-process_file('master_outdoor.csv', athletes)
+# Process the master files
+process_file(data/'master_indoor.csv', athletes)
+process_file('data/master_outdoor.csv', athletes)
 
-with open('school_ids.csv', 'w+') as f:
-    writer = csv.writer(f)
-    for k in master.school_ids:
-        writer.writerow([k, master.school_ids[k]])
-
-
+util.save_school_ids()
